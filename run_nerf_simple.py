@@ -11,7 +11,7 @@ from tqdm import tqdm, trange
 
 import matplotlib.pyplot as plt
 
-from run_nerf_helpers import *
+from run_nerf_helpers_simple import *
 
 from load_blender import load_blender_data
 
