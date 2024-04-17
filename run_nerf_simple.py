@@ -176,10 +176,10 @@ def create_nerf(args):
     """Instantiate NeRF's MLP model.
     """
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed) # (10, 0)
-
+    # project input_ch = 63
     input_ch_views = 0
     embeddirs_fn = None
-    embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
+    embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed) # project input_ch_views = 27
     output_ch = 5 
     skips = [4]
     model = NeRF(D=args.netdepth, W=args.netwidth,
