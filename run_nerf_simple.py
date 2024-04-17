@@ -606,29 +606,9 @@ def train():
     # Prepare raybatch tensor if batching random rays
     N_rand = args.N_rand # 1024
     use_batching = not args.no_batching # use_batching = False
-    if use_batching:
-        # For random ray batching
-        print('get rays')
-        rays = np.stack([get_rays_np(H, W, K, p) for p in poses[:,:3,:4]], 0) # [N, ro+rd, H, W, 3]
-        print('done, concats')
-        rays_rgb = np.concatenate([rays, images[:,None]], 1) # [N, ro+rd+rgb, H, W, 3]
-        rays_rgb = np.transpose(rays_rgb, [0,2,3,1,4]) # [N, H, W, ro+rd+rgb, 3]
-        rays_rgb = np.stack([rays_rgb[i] for i in i_train], 0) # train images only
-        rays_rgb = np.reshape(rays_rgb, [-1,3,3]) # [(N-1)*H*W, ro+rd+rgb, 3]
-        rays_rgb = rays_rgb.astype(np.float32)
-        print('shuffle rays')
-        np.random.shuffle(rays_rgb)
-
-        print('done')
-        i_batch = 0
 
     # Move training data to GPU
-    if use_batching:
-        images = torch.Tensor(images).to(device)
     poses = torch.Tensor(poses).to(device)
-    if use_batching:
-        rays_rgb = torch.Tensor(rays_rgb).to(device)
-
 
     N_iters = 200000 + 1
     print('Begin')
@@ -642,51 +622,35 @@ def train():
     start = start + 1
     for i in trange(start, N_iters):
         time0 = time.time()
+        
+        # Random from one image
+        img_i = np.random.choice(i_train)
+        target = images[img_i]
+        target = torch.Tensor(target).to(device)
+        pose = poses[img_i, :3,:4]
 
-        # Sample random ray batch
-        if use_batching:
-            # Random over all images
-            batch = rays_rgb[i_batch:i_batch+N_rand] # [B, 2+1, 3*?]
-            batch = torch.transpose(batch, 0, 1)
-            batch_rays, target_s = batch[:2], batch[2]
+        rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
 
-            i_batch += N_rand
-            if i_batch >= rays_rgb.shape[0]:
-                print("Shuffle data after an epoch!")
-                rand_idx = torch.randperm(rays_rgb.shape[0])
-                rays_rgb = rays_rgb[rand_idx]
-                i_batch = 0
-
+        if i < args.precrop_iters:
+            dH = int(H//2 * args.precrop_frac)
+            dW = int(W//2 * args.precrop_frac)
+            coords = torch.stack(
+                torch.meshgrid(
+                    torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
+                    torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
+                ), -1)
+            if i == start:
+                print(f"[Config] Center cropping of size {2*dH} x {2*dW} is enabled until iter {args.precrop_iters}")                
         else:
-            # Random from one image
-            img_i = np.random.choice(i_train)
-            target = images[img_i]
-            target = torch.Tensor(target).to(device)
-            pose = poses[img_i, :3,:4]
+            coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
 
-            if N_rand is not None:
-                rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
-
-                if i < args.precrop_iters:
-                    dH = int(H//2 * args.precrop_frac)
-                    dW = int(W//2 * args.precrop_frac)
-                    coords = torch.stack(
-                        torch.meshgrid(
-                            torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
-                            torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
-                        ), -1)
-                    if i == start:
-                        print(f"[Config] Center cropping of size {2*dH} x {2*dW} is enabled until iter {args.precrop_iters}")                
-                else:
-                    coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
-
-                coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
-                select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
-                select_coords = coords[select_inds].long()  # (N_rand, 2)
-                rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays = torch.stack([rays_o, rays_d], 0)
-                target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+        coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
+        select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
+        select_coords = coords[select_inds].long()  # (N_rand, 2)
+        rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+        rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+        batch_rays = torch.stack([rays_o, rays_d], 0)
+        target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
 
         #####  Core optimization loop  #####
         rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
