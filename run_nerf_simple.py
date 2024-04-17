@@ -175,7 +175,7 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
 def create_nerf(args):
     """Instantiate NeRF's MLP model.
     """
-    embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
+    embed_fn, input_ch = get_embedder(args.multires, args.i_embed) # (10, 0)
 
     input_ch_views = 0
     embeddirs_fn = None
