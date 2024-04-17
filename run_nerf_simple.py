@@ -89,26 +89,17 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
       acc_map: [batch_size]. Accumulated opacity (alpha) along a ray.
       extras: dict with everything returned by render_rays().
     """
-    if c2w is not None:
-        # special case to render full image
-        rays_o, rays_d = get_rays(H, W, K, c2w)
-    else:
-        # use provided ray batch
-        rays_o, rays_d = rays
+   
+    # use provided ray batch
+    rays_o, rays_d = rays
 
-    if use_viewdirs:
-        # provide ray directions as input
-        viewdirs = rays_d
-        if c2w_staticcam is not None:
-            # special case to visualize effect of viewdirs
-            rays_o, rays_d = get_rays(H, W, K, c2w_staticcam)
-        viewdirs = viewdirs / torch.norm(viewdirs, dim=-1, keepdim=True)
-        viewdirs = torch.reshape(viewdirs, [-1,3]).float()
+    
+    # provide ray directions as input
+    viewdirs = rays_d
+    viewdirs = viewdirs / torch.norm(viewdirs, dim=-1, keepdim=True)
+    viewdirs = torch.reshape(viewdirs, [-1,3]).float()
 
     sh = rays_d.shape # [..., 3]
-    if ndc:
-        # for forward facing scenes
-        rays_o, rays_d = ndc_rays(H, W, K[0][0], 1., rays_o, rays_d)
 
     # Create ray batch
     rays_o = torch.reshape(rays_o, [-1,3]).float()
@@ -116,8 +107,7 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
 
     near, far = near * torch.ones_like(rays_d[...,:1]), far * torch.ones_like(rays_d[...,:1])
     rays = torch.cat([rays_o, rays_d, near, far], -1)
-    if use_viewdirs:
-        rays = torch.cat([rays, viewdirs], -1)
+    rays = torch.cat([rays, viewdirs], -1)
 
     # Render and reshape
     all_ret = batchify_rays(rays, chunk, **kwargs)
