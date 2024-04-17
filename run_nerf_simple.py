@@ -339,10 +339,7 @@ def render_rays(ray_batch,
     near, far = bounds[...,0], bounds[...,1] # [-1,1]
 
     t_vals = torch.linspace(0., 1., steps=N_samples)
-    if not lindisp:
-        z_vals = near * (1.-t_vals) + far * (t_vals)
-    else:
-        z_vals = 1./(1./near * (1.-t_vals) + 1./far * (t_vals))
+    z_vals = near * (1.-t_vals) + far * (t_vals)
 
     z_vals = z_vals.expand([N_rays, N_samples])
 
