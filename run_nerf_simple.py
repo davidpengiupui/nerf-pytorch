@@ -530,9 +530,6 @@ def train():
         [0, 0, 1]
     ])
 
-    if args.render_test:
-        render_poses = np.array(poses[i_test])
-
     # Create log dir and copy the config file
     basedir = args.basedir
     expname = args.expname
