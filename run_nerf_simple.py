@@ -588,9 +588,9 @@ def train():
 
     N_iters = 200000 + 1
     print('Begin')
-    print('TRAIN views are', i_train)
-    print('TEST views are', i_test)
-    print('VAL views are', i_val)
+    print('TRAIN views are', i_train) # [0-99]
+    print('TEST views are', i_test) # [113-130]
+    print('VAL views are', i_val) # [100-112]
 
     # Summary writers
     # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
