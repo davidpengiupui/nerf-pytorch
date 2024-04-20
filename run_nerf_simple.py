@@ -604,7 +604,7 @@ def train():
         target = images[img_i]
         target = torch.Tensor(target).to(device)
         pose = poses[img_i, :3,:4]
-
+        # Essense of pose: camera to real world translation
         rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
 
         coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
